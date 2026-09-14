@@ -1,8 +1,16 @@
 # Drone RF Classifier — Streaming Training + KServe Deployment
 
+**License:** proprietary, all rights reserved — see [`LICENSE.md`](LICENSE.md).
+This repo is public for visibility; using the software (beyond reading the
+code) requires a signed, node-locked license. Free evaluation/trial
+licenses are available for integration testing — see
+[Node-locked licensing](#node-locked-licensing-license) below.
+
 Classifies drone/RC control-link IQ captures (`DJI`, `FutabaT14`, `FutabaT7`,
 `Graupner`, `Noise`, `Taranis`, `Turnigy`) from the
-[Noisy Drone RF Signal Classification v2](https://www.kaggle.com/datasets) dataset,
+[Noisy Drone RF Signal Classification v2](https://www.kaggle.com/datasets/sgluege/noisy-drone-rf-signal-classification-v2)
+dataset (© sgluege, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) —
+see attribution in `LICENSE.md`),
 **without ever storing the full ~125GB dataset locally**. Individual sample
 files are read on demand straight out of the remote zip via HTTP range
 requests, trained on, and discarded.
@@ -209,9 +217,10 @@ enough to produce a signature it will accept.
 .venv/Scripts/python.exe -m license.generate_license keygen
 ```
 This prints a public key hex — it's already pasted into
-`license/verify.py`'s `PUBLIC_KEY_HEX` in this repo (generated for this
-session; treat `private_key.pem` in the project root as sensitive and move
-it somewhere safer than a working directory before using this for real).
+`license/verify.py`'s `PUBLIC_KEY_HEX` in this repo. **`private_key.pem`
+itself is NOT in this repo** (gitignored, and moved out of the working
+directory entirely) — whoever holds it can mint valid licenses for any
+node, so it lives outside version control and outside this folder.
 
 **Per-deployment, issue a license:**
 ```
@@ -219,12 +228,26 @@ it somewhere safer than a working directory before using this for real).
 .venv/Scripts/python.exe -m license.generate_license fingerprint   # reads /etc/machine-id
 
 .venv/Scripts/python.exe -m license.generate_license issue \
-  --private-key private_key.pem --licensee "Customer Name" \
+  --private-key <path-to-private_key.pem> --licensee "Customer Name" \
   --node-fingerprint <hex-from-above> --expires 2027-01-01 --out license.json
 ```
 Omit `--expires` for a perpetual license. `--node-fingerprint` takes one or
 more values if you need the same license to float across a small known set
 of nodes.
+
+**Free trial / integration-testing license:** same mechanism, just short-lived
+and tagged so it's visible in logs:
+```
+.venv/Scripts/python.exe -m license.generate_license issue \
+  --private-key <path-to-private_key.pem> --licensee "Prospect Co (trial)" \
+  --node-fingerprint <hex> --trial-days 14 --out trial_license.json
+```
+Sets `"tier": "trial"` and an expiry N days out; `serving/predictor.py` logs
+the licensee/tier/expiry on every startup (`kubectl logs`), so a trial
+running past its intended scope is easy to spot. It stops working the moment
+it expires — no separate mechanism needed. Good for handing a prospective
+customer a real, working, node-locked deployment to integration-test against
+their own pipeline before they commit to a paid license.
 
 **Why hostPath for `/etc/machine-id`:** node-locking has to bind to
 something the *node* owns, not the pod — pods are ephemeral and

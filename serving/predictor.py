@@ -63,8 +63,9 @@ class DroneRFModel(Model):
             log.error("LICENSE INVALID -- refusing to start: %s", exc)
             sys.exit(1)
         log.info(
-            "License OK: licensee=%s expires=%s",
-            license_info.get("licensee"), license_info.get("expires_at", "never"),
+            "License OK: licensee=%s tier=%s expires=%s",
+            license_info.get("licensee"), license_info.get("tier", "commercial"),
+            license_info.get("expires_at", "never"),
         )
 
         self.model = torch.jit.load(str(MODEL_DIR / "model_scripted.pt"), map_location="cpu")

@@ -24,13 +24,21 @@ Workflow:
          --out license.json
      Ship license.json to the customer; they load it as a k8s Secret (see
      serving/inferenceservice.yaml).
+
+  4. Or issue a free trial (same mechanism, just short-lived and tagged):
+       .venv/Scripts/python.exe -m license.generate_license issue \
+         --private-key private_key.pem --licensee "Prospect Co (trial)" \
+         --node-fingerprint <hex> --trial-days 14 --out trial_license.json
+     Good for letting a prospective customer run their own integration
+     testing against a real node-locked deployment before buying -- it
+     just stops working when the trial expires, same as any other license.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -61,17 +69,24 @@ def cmd_fingerprint(args: argparse.Namespace) -> None:
 
 
 def cmd_issue(args: argparse.Namespace) -> None:
+    if args.trial_days and args.expires:
+        raise SystemExit("Pass either --trial-days or --expires, not both")
+
     private_key = serialization.load_pem_private_key(Path(args.private_key).read_bytes(), password=None)
     if not isinstance(private_key, Ed25519PrivateKey):
         raise SystemExit("Private key file is not an Ed25519 key")
 
+    tier = "trial" if args.trial_days else args.tier
     payload = {
         "licensee": args.licensee,
+        "tier": tier,
         "issued_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "node_fingerprints": args.node_fingerprint,  # list: supports multi-node licenses
         "features": args.feature or ["predict"],
     }
-    if args.expires:
+    if args.trial_days:
+        payload["expires_at"] = (datetime.now(timezone.utc) + timedelta(days=args.trial_days)).isoformat(timespec="seconds")
+    elif args.expires:
         payload["expires_at"] = datetime.strptime(args.expires, "%Y-%m-%d").replace(
             tzinfo=timezone.utc
         ).isoformat(timespec="seconds")
@@ -103,7 +118,9 @@ def main() -> None:
     issue_p.add_argument("--private-key", required=True)
     issue_p.add_argument("--licensee", required=True)
     issue_p.add_argument("--node-fingerprint", required=True, nargs="+", help="One or more node fingerprints (multi-node license)")
+    issue_p.add_argument("--tier", choices=["trial", "commercial"], default="commercial")
     issue_p.add_argument("--expires", default=None, help="YYYY-MM-DD, omit for a perpetual license")
+    issue_p.add_argument("--trial-days", type=int, default=None, help="Shortcut: sets tier=trial and expires N days from now")
     issue_p.add_argument("--feature", action="append", default=None)
     issue_p.add_argument("--out", default="license.json")
     issue_p.set_defaults(func=cmd_issue)
