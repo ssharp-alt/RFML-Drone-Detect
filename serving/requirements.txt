@@ -1,0 +1,4 @@
+kserve>=0.13,<0.15
+torch>=2.2
+numpy>=1.26
+cryptography>=42

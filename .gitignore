@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.shard_cache/
+checkpoints/*.pt
+checkpoints/*.pth
+checkpoints/*.ts
+zip_url.txt
+ftp_credentials.json
+*.log
+private_key.pem
+license.json
+*.dashboard_pid
+.claude/settings.local.json
