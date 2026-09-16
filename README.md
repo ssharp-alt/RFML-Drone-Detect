@@ -39,8 +39,11 @@ reuse) in a live smoke run.
 ### Why not cache everything, or nothing?
 
 Streaming every sample fresh every epoch means re-transferring close to the
-full ~125GB archive *per epoch* Caching the whole dataset to disk once defeats the "don't keep the data local memory" goal. Sharding is the middle ground: only one (or two, with prefetch) shard's worth of disk is ever used at a time, it's deleted the moment it's no longer needed, and the boustrophedon order
-recovers a chunk of the naive re-download cost for free.
+full ~125GB archive *per epoch*. Caching the whole dataset to disk once
+defeats the "don't keep the data locally" goal. Sharding is the middle
+ground: only one (or two, with prefetch) shard's worth of disk is ever used
+at a time, it's deleted the moment it's no longer needed, and the
+boustrophedon order recovers a chunk of the naive re-download cost for free.
 
 **Disk sizing**: with the default 4 train shards, each shard is roughly
 `0.7 * 125GB / 4 ≈ 22GB` compressed (a bit more decompressed on disk, since
@@ -171,7 +174,7 @@ group. In the absence of a specific receiver spec, `src/config.py` assumes a
 **20MHz commercial channel bandwidth × 1.2 margin = 24MHz sample rate**.
 This is a documented, overridable assumption
 (`ASSUMED_CHANNEL_BANDWIDTH_HZ` / `BANDWIDTH_MARGIN` env vars) — **not** a
-measured fact about any real radio.... If you know your actual SDR/receiver's
+measured fact about any real radio. If you know your actual SDR/receiver's
 sample rate, override it and re-train, or resample your captures to 24MHz
 before sending them to the endpoint. The training data itself has no
 embedded sample rate (each capture is a fixed 1,048,576-sample window,
