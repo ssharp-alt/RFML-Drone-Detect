@@ -8,7 +8,5 @@ checkpoints/*.ts
 zip_url.txt
 ftp_credentials.json
 *.log
-private_key.pem
-license.json
 *.dashboard_pid
-.claude/settings.local.json
+.claude/

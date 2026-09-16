@@ -26,7 +26,6 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -34,7 +33,6 @@ import numpy as np
 import torch
 from kserve import Model, ModelServer
 
-from license.verify import LicenseError, verify_or_raise
 from src import config
 from src.transforms import compute_log_magnitude_spectrogram
 
@@ -52,22 +50,6 @@ class DroneRFModel(Model):
         self.load()
 
     def load(self) -> None:
-        # Node-locked license check, before touching the model at all. A hard
-        # sys.exit here (rather than just leaving self.ready=False) makes a
-        # missing/invalid license loudly visible as CrashLoopBackOff in
-        # `kubectl get pods`, instead of a silently-NotReady pod that's easy
-        # to miss. See license/verify.py for what's actually being checked.
-        try:
-            license_info = verify_or_raise()
-        except LicenseError as exc:
-            log.error("LICENSE INVALID -- refusing to start: %s", exc)
-            sys.exit(1)
-        log.info(
-            "License OK: licensee=%s tier=%s expires=%s",
-            license_info.get("licensee"), license_info.get("tier", "commercial"),
-            license_info.get("expires_at", "never"),
-        )
-
         self.model = torch.jit.load(str(MODEL_DIR / "model_scripted.pt"), map_location="cpu")
         self.model.eval()
         self.class_names = json.loads((MODEL_DIR / "class_names.json").read_text())

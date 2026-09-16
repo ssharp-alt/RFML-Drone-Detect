@@ -1,16 +1,13 @@
 # Drone RF Classifier — Streaming Training + KServe Deployment
 
-**License:** proprietary, all rights reserved — see [`LICENSE.md`](LICENSE.md).
-This repo is public for visibility; using the software (beyond reading the
-code) requires a signed, node-locked license. Free evaluation/trial
-licenses are available for integration testing — see
-[Node-locked licensing](#node-locked-licensing-license) below.
+**License:** [Apache 2.0](LICENSE) — free to use, modify, and distribute,
+commercially or otherwise. Third-party dataset attribution is in [`NOTICE`](NOTICE).
 
 Classifies drone/RC control-link IQ captures (`DJI`, `FutabaT14`, `FutabaT7`,
 `Graupner`, `Noise`, `Taranis`, `Turnigy`) from the
 [Noisy Drone RF Signal Classification v2](https://www.kaggle.com/datasets/sgluege/noisy-drone-rf-signal-classification-v2)
 dataset (© sgluege, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) —
-see attribution in `LICENSE.md`),
+see attribution in `NOTICE`),
 **without ever storing the full ~125GB dataset locally**. Individual sample
 files are read on demand straight out of the remote zip via HTTP range
 requests, trained on, and discarded.
@@ -42,11 +39,7 @@ reuse) in a live smoke run.
 ### Why not cache everything, or nothing?
 
 Streaming every sample fresh every epoch means re-transferring close to the
-full ~125GB archive *per epoch* — you flagged this as the likely
-inefficiency, correctly. Caching the whole dataset to disk once defeats the
-"don't keep the data locally" goal. Sharding is the middle ground: only one
-(or two, with prefetch) shard's worth of disk is ever used at a time, it's
-deleted the moment it's no longer needed, and the boustrophedon order
+full ~125GB archive *per epoch* Caching the whole dataset to disk once defeats the "don't keep the data local memory" goal. Sharding is the middle ground: only one (or two, with prefetch) shard's worth of disk is ever used at a time, it's deleted the moment it's no longer needed, and the boustrophedon order
 recovers a chunk of the naive re-download cost for free.
 
 **Disk sizing**: with the default 4 train shards, each shard is roughly
@@ -132,29 +125,23 @@ since this session has no visibility into your cluster.
 1. Train first (produces `checkpoints/model_scripted.pt` + `class_names.json`,
    which the image bakes in — no object storage / storageUri needed, the
    simplest option for a bare k3s cluster).
-2. **If using node-locked licensing** (see below), issue `license.json` for
-   the target node *before* building, so you don't forget it.
-3. Build the image from the project root:
+2. Build the image from the project root:
    ```
    docker build -f serving/Dockerfile -t drone-rf-classifier:latest .
    ```
-4. Get the image onto your k3s nodes — either push to a registry your
+3. Get the image onto your k3s nodes — either push to a registry your
    cluster can pull from, or for a local dev cluster:
    ```
    docker save drone-rf-classifier:latest | k3s ctr images import -
    ```
-5. `kubectl create secret generic drone-rf-license --from-file=license.json=./license.json`
-6. Edit `serving/inferenceservice.yaml`'s `image:` field to match, then:
+4. Edit `serving/inferenceservice.yaml`'s `image:` field to match, then:
    ```
    kubectl apply -f serving/inferenceservice.yaml
    ```
-7. Once ready:
+5. Once ready:
    ```
    kubectl get inferenceservice drone-rf-classifier
    ```
-   If the pod is CrashLoopBackOff, `kubectl logs` first — the predictor
-   exits loudly with `LICENSE INVALID: <reason>` on any license problem
-   (see below) rather than failing silently.
 
 ### Request format
 
@@ -176,7 +163,7 @@ A flat JSON list `[I0, Q0, I1, Q1, ...]` is also accepted per-instance
 
 ### The bandwidth assumption
 
-You asked to assume the IQ pipeline handles 20% more bandwidth than a
+I assume the IQ pipeline handles 20% more bandwidth than a
 commercial drone's channel. The dataset's classes (`FutabaT14`/`T7`,
 `Graupner`, `Taranis`, `Turnigy`, `DJI`) are all 2.4GHz ISM-band RC
 control-link protocols — DJI's OcuSync/Lightbridge is the widest of the
@@ -184,83 +171,9 @@ group. In the absence of a specific receiver spec, `src/config.py` assumes a
 **20MHz commercial channel bandwidth × 1.2 margin = 24MHz sample rate**.
 This is a documented, overridable assumption
 (`ASSUMED_CHANNEL_BANDWIDTH_HZ` / `BANDWIDTH_MARGIN` env vars) — **not** a
-measured fact about any real radio. If you know your actual SDR/receiver's
+measured fact about any real radio.... If you know your actual SDR/receiver's
 sample rate, override it and re-train, or resample your captures to 24MHz
 before sending them to the endpoint. The training data itself has no
 embedded sample rate (each capture is a fixed 1,048,576-sample window,
 verified against the live archive), so the model only ever sees a fixed
 number of samples per window — at the assumed rate, ~43.7ms per capture.
-
-## Node-locked licensing (`license/`)
-
-`serving/predictor.py` refuses to start unless a signed license file
-matching the node it's running on is present — the same node-locking model
-commercial on-prem appliances use. Two files:
-
-- `license/verify.py` — **ships inside the served image.** Reads a
-  license JSON, checks its Ed25519 signature against a public key baked
-  into this file, checks expiry, and checks the current node's fingerprint
-  (`sha256(/etc/machine-id)`) is in the license's allowed list.
-- `license/generate_license.py` — **vendor-only, never shipped** (the
-  Dockerfile deliberately copies only `verify.py`). Generates the
-  keypair and signs new license files. Whoever holds the private key
-  this produces can mint licenses for any node; whoever only has the
-  image (i.e. the customer) cannot forge one, since verification only
-  needs the public key.
-
-Asymmetric signing is the whole point: the licensee has full access to the
-deployed container and can read every line of `verify.py`, but that's not
-enough to produce a signature it will accept.
-
-**One-time setup** (do this once, keep `private_key.pem` offline forever):
-```
-.venv/Scripts/python.exe -m license.generate_license keygen
-```
-This prints a public key hex — it's already pasted into
-`license/verify.py`'s `PUBLIC_KEY_HEX` in this repo. **`private_key.pem`
-itself is NOT in this repo** (gitignored, and moved out of the working
-directory entirely) — whoever holds it can mint valid licenses for any
-node, so it lives outside version control and outside this folder.
-
-**Per-deployment, issue a license:**
-```
-# on (or with input from) the target node:
-.venv/Scripts/python.exe -m license.generate_license fingerprint   # reads /etc/machine-id
-
-.venv/Scripts/python.exe -m license.generate_license issue \
-  --private-key <path-to-private_key.pem> --licensee "Customer Name" \
-  --node-fingerprint <hex-from-above> --expires 2027-01-01 --out license.json
-```
-Omit `--expires` for a perpetual license. `--node-fingerprint` takes one or
-more values if you need the same license to float across a small known set
-of nodes.
-
-**Free trial / integration-testing license:** same mechanism, just short-lived
-and tagged so it's visible in logs:
-```
-.venv/Scripts/python.exe -m license.generate_license issue \
-  --private-key <path-to-private_key.pem> --licensee "Prospect Co (trial)" \
-  --node-fingerprint <hex> --trial-days 14 --out trial_license.json
-```
-Sets `"tier": "trial"` and an expiry N days out; `serving/predictor.py` logs
-the licensee/tier/expiry on every startup (`kubectl logs`), so a trial
-running past its intended scope is easy to spot. It stops working the moment
-it expires — no separate mechanism needed. Good for handing a prospective
-customer a real, working, node-locked deployment to integration-test against
-their own pipeline before they commit to a paid license.
-
-**Why hostPath for `/etc/machine-id`:** node-locking has to bind to
-something the *node* owns, not the pod — pods are ephemeral and
-rescheduling one to a different node should NOT carry the license with it.
-`/etc/machine-id` is a stable systemd-assigned per-machine ID (changes only
-on OS reinstall), which is why `inferenceservice.yaml` mounts it in
-read-only from the host rather than trying to derive a fingerprint from
-anything inside the container. This does mean the pod won't start on a
-different node without a re-issued license — that's the intended behavior,
-not a bug; use a multi-node license (above) if you need it to float across
-a specific, known set of nodes.
-
-Verified locally end-to-end against a stand-in machine-id file: valid
-license passes, and each of wrong-node, tampered-payload, and
-past-expiry-date all fail with a clear, specific reason rather than a
-generic error.

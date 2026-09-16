@@ -6,22 +6,6 @@
 # for a bare k3s cluster. If you later want to update the model without
 # rebuilding the image, switch to a storageUri (S3/GCS/PVC) backed
 # InferenceService instead and pass --model_dir via container args.
-#
-# --- Node-locked licensing (see license/) -----------------------------
-# Before applying:
-#   1. kubectl create secret generic drone-rf-license --from-file=license.json=./license.json
-#      (license.json comes from `license.generate_license issue`, signed
-#      for this specific node's /etc/machine-id fingerprint.)
-#   2. Label the licensed node and uncomment nodeSelector below, so the
-#      scheduler doesn't waste time placing this pod on a node the license
-#      doesn't cover:
-#      kubectl label node <node-name> drone-rf-license=allowed
-# The /etc/machine-id hostPath mount ties the check to the physical/VM node
-# the pod actually lands on, not to the pod or container -- if the pod gets
-# rescheduled to a different node, the fingerprint won't match and the
-# license check will correctly refuse to start (re-issue a multi-node
-# license via generate_license.py's --node-fingerprint, which takes more
-# than one value, if you need it to float across specific nodes).
 apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
@@ -34,8 +18,6 @@ spec:
     # request after idling.
     minReplicas: 1
     maxReplicas: 3
-    # nodeSelector:
-    #   drone-rf-license: allowed
     containers:
       - name: kserve-container
         image: REPLACE_WITH_YOUR_IMAGE   # e.g. localhost:5000/drone-rf-classifier:latest
@@ -57,18 +39,3 @@ spec:
         # resources:
         #   limits:
         #     nvidia.com/gpu: "1"
-        volumeMounts:
-          - name: machine-id
-            mountPath: /etc/machine-id
-            readOnly: true
-          - name: license
-            mountPath: /etc/drone-rf-license
-            readOnly: true
-    volumes:
-      - name: machine-id
-        hostPath:
-          path: /etc/machine-id
-          type: File
-      - name: license
-        secret:
-          secretName: drone-rf-license

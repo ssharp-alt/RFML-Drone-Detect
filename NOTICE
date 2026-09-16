@@ -1,0 +1,23 @@
+Drone RF Classifier
+Copyright 2026 Sharp Digital Holdings LLC
+
+This product includes software developed by Sharp Digital Holdings LLC,
+licensed under the Apache License, Version 2.0.
+
+------------------------------------------------------------------------
+
+Third-party data attribution
+
+The model trainable from this repository uses the "Noisy Drone RF Signal
+Classification v2" dataset, created by sgluege (https://www.kaggle.com/sgluege)
+and published at
+https://www.kaggle.com/datasets/sgluege/noisy-drone-rf-signal-classification-v2,
+licensed under Creative Commons Attribution 4.0 International (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+
+No modified or unmodified copy of that dataset is redistributed as part of
+this repository -- src/train.py streams individual samples from the
+original source (a Kaggle-hosted archive, or an equivalent mirror) at
+training time. This attribution is provided in compliance with the CC BY
+4.0 license's attribution requirement for the derivative work (the trained
+model) produced from that dataset.
