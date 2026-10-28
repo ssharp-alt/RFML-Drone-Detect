@@ -8,9 +8,10 @@ Classifies drone/RC control-link IQ captures (`DJI`, `FutabaT14`, `FutabaT7`,
 [Noisy Drone RF Signal Classification v2](https://www.kaggle.com/datasets/sgluege/noisy-drone-rf-signal-classification-v2)
 dataset (© sgluege, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) —
 see attribution in `NOTICE`),
+
 **without ever storing the full ~125GB dataset locally**. Individual sample
 files are read on demand straight out of the remote zip via HTTP range
-requests, trained on, and discarded.
+requests, trained on, and discarded. This can be a road map for others to train models on large datasets without downloading everything..
 
 `ProtoType.py` (project root) is the original local-file prototype: it reads
 `.pt` files from disk and rasterizes each one to a PNG spectrogram image. It's
@@ -68,8 +69,8 @@ $env:DRONE_RF_ZIP_URL = "https://storage.googleapis.com/..."
 ```
 
 or by writing it to `zip_url.txt` in the project root (already
-`.gitignore`d; this repo was bootstrapped with the URL you provided, written
-there for convenience — replace it once it expires).
+`.gitignore`d; this repo was bootstrapped with the URL provided, written
+there for convenience — replace it's expired).
 
 ## Training
 
@@ -122,8 +123,8 @@ Checkpoint used for serving: `checkpoints/best.pt` (epoch 9), exported to
 
 ## Deploying to KServe on k3s
 
-`serving/` contains **artifacts only** — build/push/apply are left to you
-since this session has no visibility into your cluster.
+`serving/` contains **artifacts only** — build/push/apply are left to you (future work)
+since this work has no visibility into your cluster.
 
 1. Train first (produces `checkpoints/model_scripted.pt` + `class_names.json`,
    which the image bakes in — no object storage / storageUri needed, the
